@@ -10,6 +10,13 @@ app.use(express.json({ limit: '32kb' }));
 const PORT = process.env.PORT || 3000;
 const VERSION = 'blue-mode-translation-v2';
 
+const TRANSLATE_API_URL =
+  process.env.TRANSLATE_API_URL ||
+  'https://libretranslate.com/translate';
+
+const TRANSLATE_API_KEY =
+  process.env.TRANSLATE_API_KEY || '';
+
 const LANGUAGES = {
   afrikaans: 'af',
   albanian: 'sq',
@@ -153,6 +160,122 @@ const LANGUAGES = {
   waray: 'war'
 };
 
+// Additional world-language catalogue.
+// These entries expand the list shown by GET /languages.
+// Listing a language does not guarantee provider support.
+const WORLD_LANGUAGES = {
+  'Afar': 'aa',
+  'Akan': 'ak',
+  'Akkadian': 'akk',
+  'Aleut': 'ale',
+  'American Sign Language': 'ase',
+  'Aragonese': 'an',
+  'Aromanian': 'rup',
+  'Asturian': 'ast',
+  'Balinese': 'ban',
+  'Baluchi': 'bal',
+  'Banyumasan': 'map-bms',
+  'Bikol': 'bik',
+  'Bislama': 'bi',
+  'Breton': 'br',
+  'Buginese': 'bug',
+  'Cantonese': 'yue',
+  'Chamorro': 'ch',
+  'Chechen': 'ce',
+  'Cherokee': 'chr',
+  'Chichewa': 'ny',
+  'Chuvash': 'cv',
+  'Cornish': 'kw',
+  'Crimean Tatar': 'crh',
+  'Dari': 'prs',
+  'Dinka': 'din',
+  'Dzongkha': 'dz',
+  'Efik': 'efi',
+  'Erzya': 'myv',
+  'Faroese': 'fo',
+  'Fijian': 'fj',
+  'Fula': 'ff',
+  'Friulian': 'fur',
+  'Gagauz': 'gag',
+  'Gilbertese': 'gil',
+  'Gothic': 'got',
+  'Greenlandic': 'kl',
+  'Hakka Chinese': 'hak',
+  'Hiri Motu': 'ho',
+  'Inari Sami': 'smn',
+  'Ingush': 'inh',
+  'Interlingua': 'ia',
+  'Interlingue': 'ie',
+  'Inuktitut': 'iu',
+  'Inupiaq': 'ik',
+  'Judeo-Arabic': 'jrb',
+  'Kabardian': 'kbd',
+  'Kabyle': 'kab',
+  'Kachin': 'kac',
+  'Kamba': 'kam',
+  'Kanuri': 'kr',
+  'Karakalpak': 'kaa',
+  'Karachay-Balkar': 'krc',
+  'Kashubian': 'csb',
+  'Kashmiri': 'ks',
+  'Kikuyu': 'ki',
+  'Komi': 'kv',
+  'Kongo': 'kg',
+  'Koryak': 'kpy',
+  'Kpelle': 'kpe',
+  'Ladino': 'lad',
+  'Laz': 'lzz',
+  'Lezghian': 'lez',
+  'Limburgish': 'li',
+  'Livonian': 'liv',
+  'Lojban': 'jbo',
+  'Luba-Katanga': 'lu',
+  'Luba-Lulua': 'lua',
+  'Lule Sami': 'smj',
+  'Luo': 'luo',
+  'Madurese': 'mad',
+  'Makasar': 'mak',
+  'Manx': 'gv',
+  'Marshallese': 'mh',
+  'Minangkabau': 'min',
+  'Mirandese': 'mwl',
+  'Mohawk': 'moh',
+  'Nahuatl': 'nah',
+  'Nauruan': 'na',
+  'Navajo': 'nv',
+  'Ndebele': 'nd',
+  'Neapolitan': 'nap',
+  'Newari': 'new',
+  'NKo': 'nqo',
+  'Northern Sami': 'se',
+  'Novial': 'nov',
+  'Occitan': 'oc',
+  'Ossetian': 'os',
+  'Papiamento': 'pap',
+  'Pangasinan': 'pag',
+  'Romansh': 'rm',
+  'Romani': 'rom',
+  'Sardinian': 'sc',
+  'Saterland Frisian': 'stq',
+  'Sicilian': 'scn',
+  'Silesian': 'szl',
+  'Tahitian': 'ty',
+  'Tamasheq': 'tmh',
+  'Tongan': 'to',
+  'Tumbuka': 'tum',
+  'Tuvinian': 'tyv',
+  'Udmurt': 'udm',
+  'Upper Sorbian': 'hsb',
+  'Venetian': 'vec',
+  'Veps': 'vep',
+  'Walloon': 'wa',
+  'Wolof': 'wo',
+  'Yakut': 'sah',
+  'Yao': 'yao',
+  'Zaza': 'zza',
+  'Zhuang': 'za'
+};
+
 const LANGUAGE_NAMES = {};
 
 for (const [name, code] of Object.entries(LANGUAGES)) {
@@ -173,6 +296,13 @@ Object.assign(LANGUAGE_NAMES, {
   hil: 'Hiligaynon / Ilonggo',
   war: 'Waray'
 });
+
+// Add the expanded catalogue to language normalization.
+for (const [name, code] of Object.entries(WORLD_LANGUAGES)) {
+  if (!LANGUAGES[name.toLowerCase()]) {
+    LANGUAGES[name.toLowerCase()] = code;
+  }
+}
 
 function normalizeLanguage(value) {
   const requested = String(value || 'English').trim();
@@ -196,10 +326,13 @@ app.get('/', (_req, res) => {
 
 // Health endpoint
 app.get('/health', (_req, res) => {
-  res.json({ ok: true, version: VERSION });
+  res.json({
+    ok: true,
+    version: VERSION
+  });
 });
 
-// Debug endpoint: confirms which version Render is running
+// Debug endpoint
 app.get('/debug-version', (_req, res) => {
   res.json({
     ok: true,
@@ -211,21 +344,49 @@ app.get('/debug-version', (_req, res) => {
 
 // Supported languages
 app.get('/languages', (_req, res) => {
-  const languages = Object.entries(LANGUAGES)
-    .map(([name, code]) => ({ name, code }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const combined = new Map();
+
+  for (const [name, code] of Object.entries(LANGUAGES)) {
+    const key = name.toLowerCase();
+
+    if (!combined.has(key)) {
+      combined.set(key, {
+        name,
+        code,
+        status: 'unverified'
+      });
+    }
+  }
+
+  for (const [name, code] of Object.entries(WORLD_LANGUAGES)) {
+    const key = name.toLowerCase();
+
+    if (!combined.has(key)) {
+      combined.set(key, {
+        name,
+        code,
+        status: 'unverified'
+      });
+    }
+  }
+
+  const languages = [...combined.values()].sort(
+    (a, b) => a.name.localeCompare(b.name)
+  );
 
   res.json({
     ok: true,
     count: languages.length,
+    note: 'Listed languages are not necessarily supported by the translation provider.',
     languages
   });
 });
 
-// Translate text
+// Translate text using LibreTranslate
 app.post('/translate', async (req, res) => {
   try {
     const text = req.body?.text;
+
     const requestedLanguage = String(
       req.body?.targetLanguage || 'English'
     ).trim();
@@ -254,60 +415,81 @@ app.post('/translate', async (req, res) => {
       });
     }
 
-    const url = new URL(
-      'https://translate.googleapis.com/translate_a/single'
-    );
+    const providerPayload = {
+      q: text,
+      source: 'auto',
+      target: target.code,
+      format: 'text'
+    };
 
-    url.searchParams.set('client', 'gtx');
-    url.searchParams.set('sl', 'auto');
-    url.searchParams.set('tl', target.code);
-    url.searchParams.set('dt', 't');
-    url.searchParams.set('q', text);
+    if (TRANSLATE_API_KEY) {
+      providerPayload.api_key = TRANSLATE_API_KEY;
+    }
 
-    const upstream = await fetch(url, {
+    const upstream = await fetch(TRANSLATE_API_URL, {
+      method: 'POST',
       headers: {
-        'User-Agent': 'BlueModeTranslation/2.0',
+        'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      signal: AbortSignal.timeout(15000)
+      body: JSON.stringify(providerPayload),
+      signal: AbortSignal.timeout(20000)
     });
 
+    const providerBody = await upstream.text();
+
+    let data;
+
+    try {
+      data = JSON.parse(providerBody);
+    } catch (_parseError) {
+      console.error(
+        'Translation provider returned non-JSON:',
+        upstream.status
+      );
+
+      return res.status(502).json({
+        ok: false,
+        error: 'Translation provider returned an invalid response.',
+        providerStatus: upstream.status
+      });
+    }
+
     if (!upstream.ok) {
-      console.error('Translation provider status:', upstream.status);
+      console.error(
+        'Translation provider status:',
+        upstream.status,
+        data
+      );
 
       return res.status(502).json({
         ok: false,
-        error: 'Translation provider returned an error.'
+        error: 'Translation provider returned an error.',
+        providerStatus: upstream.status,
+        providerMessage: String(
+          data.error ||
+          data.message ||
+          'No provider details supplied'
+        ).slice(0, 300)
       });
     }
 
-    const data = await upstream.json();
+    const translatedText = data.translatedText;
 
-    if (!Array.isArray(data) || !Array.isArray(data[0])) {
+    if (
+      typeof translatedText !== 'string' ||
+      !translatedText.trim()
+    ) {
       return res.status(502).json({
         ok: false,
-        error: 'Unexpected translation provider response.'
-      });
-    }
-
-    const translatedText = data[0]
-      .filter(segment =>
-        Array.isArray(segment) &&
-        typeof segment[0] === 'string'
-      )
-      .map(segment => segment[0])
-      .join('');
-
-    if (!translatedText) {
-      return res.status(502).json({
-        ok: false,
-        error: 'No translated text was returned.'
+        error: 'No translated text was returned by the provider.'
       });
     }
 
     const detectedCode =
-      typeof data[2] === 'string' && data[2].trim()
-        ? data[2].trim()
+      typeof data.detectedLanguage?.language === 'string' &&
+      data.detectedLanguage.language.trim()
+        ? data.detectedLanguage.language.trim()
         : 'und';
 
     return res.json({
@@ -316,14 +498,17 @@ app.post('/translate', async (req, res) => {
       detectedLanguage: detectedCode,
       detectedLanguageName:
         LANGUAGE_NAMES[detectedCode.toLowerCase()] ||
-        (detectedCode === 'und'
-          ? 'Undetermined'
-          : `Language (${detectedCode})`),
+        (
+          detectedCode === 'und'
+            ? 'Undetermined'
+            : `Language (${detectedCode})`
+        ),
       targetLanguage: target.code,
       targetLanguageName:
         LANGUAGE_NAMES[target.code.toLowerCase()] ||
         target.requested
     });
+
   } catch (error) {
     console.error('Translation error:', error);
 
