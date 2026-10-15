@@ -276,6 +276,7 @@ const WORLD_LANGUAGES = {
   Zhuang: 'za'
 };
 
+// Add world languages to the main language catalogue.
 for (const [name, code] of Object.entries(WORLD_LANGUAGES)) {
   const key = name.toLowerCase();
 
@@ -336,7 +337,7 @@ function sendError(res, status, error, extra = {}) {
   });
 }
 
-// Root endpoint
+// Root endpoint.
 app.get('/', (_req, res) => {
   res.json({
     ok: true,
@@ -352,7 +353,7 @@ app.get('/', (_req, res) => {
   });
 });
 
-// Health endpoint
+// Health endpoint.
 app.get('/health', (_req, res) => {
   res.json({
     ok: true,
@@ -361,7 +362,7 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// Debug endpoint
+// Debug endpoint.
 app.get('/debug-version', (_req, res) => {
   res.json({
     ok: true,
@@ -379,7 +380,7 @@ app.get('/debug-version', (_req, res) => {
   });
 });
 
-// Supported languages
+// Supported languages endpoint.
 app.get('/languages', (_req, res) => {
   const combined = new Map();
 
@@ -420,11 +421,11 @@ app.get('/languages', (_req, res) => {
   });
 });
 
-// Browser status route.
-// This makes opening /translate in a browser return ok:true.
-// It does NOT perform a translation; translations use POST below.
+// NEW: Browser status route.
+// Opening /translate in a browser uses GET, so return a helpful status response.
+// This checks the route only; it does not perform a translation.
 app.get('/translate', (_req, res) => {
-  res.json({
+  res.status(200).json({
     ok: true,
     service: 'Blue Mode Translation API',
     version: VERSION,
@@ -436,11 +437,12 @@ app.get('/translate', (_req, res) => {
       targetLanguage: 'English'
     },
     message:
-      'The translation endpoint is available. Send a POST request with text and targetLanguage to translate.'
+      'The endpoint is available. Send a POST request with text and targetLanguage to translate.'
   });
 });
 
-// Translation endpoint
+// Translation endpoint.
+// Actual translations are performed by POST requests.
 app.post('/translate', async (req, res) => {
   try {
     const body = req.body || {};
@@ -661,7 +663,7 @@ app.use((error, _req, res, next) => {
   return next(error);
 });
 
-// Unknown routes
+// Unknown routes.
 app.use((req, res) => {
   res.status(404).json({
     ok: false,
@@ -676,14 +678,11 @@ app.use((req, res) => {
       'GET /translate',
       'POST /translate'
     ],
-    hint:
-      req.path === '/translate' && req.method === 'GET'
-        ? 'The GET status route should exist. Check that the latest server version was deployed.'
-        : 'Check the URL path and HTTP method.'
+    hint: 'Check the URL path and HTTP method.'
   });
 });
 
-// Final error handler
+// Final error handler.
 app.use((error, _req, res, _next) => {
   console.error('Unhandled server error:', error);
 
