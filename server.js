@@ -8,7 +8,7 @@ app.disable('x-powered-by');
 app.use(express.json({ limit: '32kb' }));
 
 const PORT = process.env.PORT || 3000;
-const VERSION = 'blue-mode-translation-v2';
+const VERSION = 'blue-mode-translation-v3';
 
 const TRANSLATE_API_URL =
   process.env.TRANSLATE_API_URL ||
@@ -16,6 +16,9 @@ const TRANSLATE_API_URL =
 
 const TRANSLATE_API_KEY =
   process.env.TRANSLATE_API_KEY || '';
+
+const REQUEST_TIMEOUT_MS = 20000;
+const MAX_TEXT_LENGTH = 4000;
 
 const LANGUAGES = {
   afrikaans: 'af',
@@ -160,129 +163,139 @@ const LANGUAGES = {
   waray: 'war'
 };
 
-// Additional world-language catalogue.
-// These entries expand the list shown by GET /languages.
-// Listing a language does not guarantee provider support.
 const WORLD_LANGUAGES = {
-  'Afar': 'aa',
-  'Akan': 'ak',
-  'Akkadian': 'akk',
-  'Aleut': 'ale',
+  Afar: 'aa',
+  Akan: 'ak',
+  Akkadian: 'akk',
+  Aleut: 'ale',
   'American Sign Language': 'ase',
-  'Aragonese': 'an',
-  'Aromanian': 'rup',
-  'Asturian': 'ast',
-  'Balinese': 'ban',
-  'Baluchi': 'bal',
-  'Banyumasan': 'map-bms',
-  'Bikol': 'bik',
-  'Bislama': 'bi',
-  'Breton': 'br',
-  'Buginese': 'bug',
-  'Cantonese': 'yue',
-  'Chamorro': 'ch',
-  'Chechen': 'ce',
-  'Cherokee': 'chr',
-  'Chichewa': 'ny',
-  'Chuvash': 'cv',
-  'Cornish': 'kw',
+  Aragonese: 'an',
+  Aromanian: 'rup',
+  Asturian: 'ast',
+  Balinese: 'ban',
+  Baluchi: 'bal',
+  Banyumasan: 'map-bms',
+  Bikol: 'bik',
+  Bislama: 'bi',
+  Breton: 'br',
+  Buginese: 'bug',
+  Cantonese: 'yue',
+  Chamorro: 'ch',
+  Chechen: 'ce',
+  Cherokee: 'chr',
+  Chichewa: 'ny',
+  Chuvash: 'cv',
+  Cornish: 'kw',
   'Crimean Tatar': 'crh',
-  'Dari': 'prs',
-  'Dinka': 'din',
-  'Dzongkha': 'dz',
-  'Efik': 'efi',
-  'Erzya': 'myv',
-  'Faroese': 'fo',
-  'Fijian': 'fj',
-  'Fula': 'ff',
-  'Friulian': 'fur',
-  'Gagauz': 'gag',
-  'Gilbertese': 'gil',
-  'Gothic': 'got',
-  'Greenlandic': 'kl',
+  Dari: 'prs',
+  Dinka: 'din',
+  Dzongkha: 'dz',
+  Efik: 'efi',
+  Erzya: 'myv',
+  Faroese: 'fo',
+  Fijian: 'fj',
+  Fula: 'ff',
+  Friulian: 'fur',
+  Gagauz: 'gag',
+  Gilbertese: 'gil',
+  Gothic: 'got',
+  Greenlandic: 'kl',
   'Hakka Chinese': 'hak',
   'Hiri Motu': 'ho',
   'Inari Sami': 'smn',
-  'Ingush': 'inh',
-  'Interlingua': 'ia',
-  'Interlingue': 'ie',
-  'Inuktitut': 'iu',
-  'Inupiaq': 'ik',
+  Ingush: 'inh',
+  Interlingua: 'ia',
+  Interlingue: 'ie',
+  Inuktitut: 'iu',
+  Inupiaq: 'ik',
   'Judeo-Arabic': 'jrb',
-  'Kabardian': 'kbd',
-  'Kabyle': 'kab',
-  'Kachin': 'kac',
-  'Kamba': 'kam',
-  'Kanuri': 'kr',
-  'Karakalpak': 'kaa',
+  Kabardian: 'kbd',
+  Kabyle: 'kab',
+  Kachin: 'kac',
+  Kamba: 'kam',
+  Kanuri: 'kr',
+  Karakalpak: 'kaa',
   'Karachay-Balkar': 'krc',
-  'Kashubian': 'csb',
-  'Kashmiri': 'ks',
-  'Kikuyu': 'ki',
-  'Komi': 'kv',
-  'Kongo': 'kg',
-  'Koryak': 'kpy',
-  'Kpelle': 'kpe',
-  'Ladino': 'lad',
-  'Laz': 'lzz',
-  'Lezghian': 'lez',
-  'Limburgish': 'li',
-  'Livonian': 'liv',
-  'Lojban': 'jbo',
+  Kashubian: 'csb',
+  Kashmiri: 'ks',
+  Kikuyu: 'ki',
+  Komi: 'kv',
+  Kongo: 'kg',
+  Koryak: 'kpy',
+  Kpelle: 'kpe',
+  Ladino: 'lad',
+  Laz: 'lzz',
+  Lezghian: 'lez',
+  Limburgish: 'li',
+  Livonian: 'liv',
+  Lojban: 'jbo',
   'Luba-Katanga': 'lu',
   'Luba-Lulua': 'lua',
   'Lule Sami': 'smj',
-  'Luo': 'luo',
-  'Madurese': 'mad',
-  'Makasar': 'mak',
-  'Manx': 'gv',
-  'Marshallese': 'mh',
-  'Minangkabau': 'min',
-  'Mirandese': 'mwl',
-  'Mohawk': 'moh',
-  'Nahuatl': 'nah',
-  'Nauruan': 'na',
-  'Navajo': 'nv',
-  'Ndebele': 'nd',
-  'Neapolitan': 'nap',
-  'Newari': 'new',
-  'NKo': 'nqo',
+  Luo: 'luo',
+  Madurese: 'mad',
+  Makasar: 'mak',
+  Manx: 'gv',
+  Marshallese: 'mh',
+  Minangkabau: 'min',
+  Mirandese: 'mwl',
+  Mohawk: 'moh',
+  Nahuatl: 'nah',
+  Nauruan: 'na',
+  Navajo: 'nv',
+  Ndebele: 'nd',
+  Neapolitan: 'nap',
+  Newari: 'new',
+  NKo: 'nqo',
   'Northern Sami': 'se',
-  'Novial': 'nov',
-  'Occitan': 'oc',
-  'Ossetian': 'os',
-  'Papiamento': 'pap',
-  'Pangasinan': 'pag',
-  'Romansh': 'rm',
-  'Romani': 'rom',
-  'Sardinian': 'sc',
+  Novial: 'nov',
+  Occitan: 'oc',
+  Ossetian: 'os',
+  Papiamento: 'pap',
+  Pangasinan: 'pag',
+  Romansh: 'rm',
+  Romani: 'rom',
+  Sardinian: 'sc',
   'Saterland Frisian': 'stq',
-  'Sicilian': 'scn',
-  'Silesian': 'szl',
-  'Tahitian': 'ty',
-  'Tamasheq': 'tmh',
-  'Tongan': 'to',
-  'Tumbuka': 'tum',
-  'Tuvinian': 'tyv',
-  'Udmurt': 'udm',
+  Sicilian: 'scn',
+  Silesian: 'szl',
+  Tahitian: 'ty',
+  Tamasheq: 'tmh',
+  Tongan: 'to',
+  Tumbuka: 'tum',
+  Tuvinian: 'tyv',
+  Udmurt: 'udm',
   'Upper Sorbian': 'hsb',
-  'Venetian': 'vec',
-  'Veps': 'vep',
-  'Walloon': 'wa',
-  'Wolof': 'wo',
-  'Yakut': 'sah',
-  'Yao': 'yao',
-  'Zaza': 'zza',
-  'Zhuang': 'za'
+  Venetian: 'vec',
+  Veps: 'vep',
+  Walloon: 'wa',
+  Wolof: 'wo',
+  Yakut: 'sah',
+  Yao: 'yao',
+  Zaza: 'zza',
+  Zhuang: 'za'
 };
+
+// Add all language names before constructing the reverse catalogue.
+for (const [name, code] of Object.entries(WORLD_LANGUAGES)) {
+  const key = name.toLowerCase();
+
+  if (!LANGUAGES[key]) {
+    LANGUAGES[key] = code;
+  }
+}
 
 const LANGUAGE_NAMES = {};
 
 for (const [name, code] of Object.entries(LANGUAGES)) {
-  if (!LANGUAGE_NAMES[code.toLowerCase()]) {
-    LANGUAGE_NAMES[code.toLowerCase()] = name
+  const key = code.toLowerCase();
+
+  if (!LANGUAGE_NAMES[key]) {
+    LANGUAGE_NAMES[key] = name
       .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .map(word =>
+        word.charAt(0).toUpperCase() + word.slice(1)
+      )
       .join(' ');
   }
 }
@@ -297,13 +310,6 @@ Object.assign(LANGUAGE_NAMES, {
   war: 'Waray'
 });
 
-// Add the expanded catalogue to language normalization.
-for (const [name, code] of Object.entries(WORLD_LANGUAGES)) {
-  if (!LANGUAGES[name.toLowerCase()]) {
-    LANGUAGES[name.toLowerCase()] = code;
-  }
-}
-
 function normalizeLanguage(value) {
   const requested = String(value || 'English').trim();
   const code = LANGUAGES[requested.toLowerCase()] || requested;
@@ -315,12 +321,34 @@ function normalizeLanguage(value) {
   return { requested, code };
 }
 
-// Root health check
+function languageName(code, fallback) {
+  if (!code) return fallback || 'Undetermined';
+
+  return LANGUAGE_NAMES[String(code).toLowerCase()] ||
+    fallback ||
+    `Language (${code})`;
+}
+
+function sendError(res, status, error, extra = {}) {
+  return res.status(status).json({
+    ok: false,
+    error,
+    ...extra
+  });
+}
+
+// Root endpoint
 app.get('/', (_req, res) => {
   res.json({
     ok: true,
     service: 'Blue Mode Translation API',
-    version: VERSION
+    version: VERSION,
+    routes: {
+      health: 'GET /health',
+      debugVersion: 'GET /debug-version',
+      languages: 'GET /languages',
+      translate: 'POST /translate'
+    }
   });
 });
 
@@ -328,6 +356,7 @@ app.get('/', (_req, res) => {
 app.get('/health', (_req, res) => {
   res.json({
     ok: true,
+    service: 'Blue Mode Translation API',
     version: VERSION
   });
 });
@@ -337,8 +366,15 @@ app.get('/debug-version', (_req, res) => {
   res.json({
     ok: true,
     version: VERSION,
+    translateRouteExists: true,
     languagesRouteExists: true,
-    translateRouteExists: true
+    providerConfigured: Boolean(TRANSLATE_API_URL),
+    providerApiKeyConfigured: Boolean(TRANSLATE_API_KEY),
+    translateMethod: 'POST',
+    expectedBody: {
+      text: 'string',
+      targetLanguage: 'string'
+    }
   });
 });
 
@@ -377,42 +413,77 @@ app.get('/languages', (_req, res) => {
   res.json({
     ok: true,
     count: languages.length,
-    note: 'Listed languages are not necessarily supported by the translation provider.',
+    note:
+      'Languages are listed for selection. Actual support depends on the translation provider.',
     languages
   });
 });
 
-// Translate text using LibreTranslate
+// Translation endpoint
 app.post('/translate', async (req, res) => {
   try {
-    const text = req.body?.text;
+    const body = req.body || {};
 
-    const requestedLanguage = String(
-      req.body?.targetLanguage || 'English'
-    ).trim();
+    // Accept common input field names.
+    const rawText =
+      body.text ??
+      body.message ??
+      body.q ??
+      body.input;
 
-    if (typeof text !== 'string' || !text.trim()) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Please provide a non-empty text string.'
-      });
+    const rawTarget =
+      body.targetLanguage ??
+      body.target_language ??
+      body.target ??
+      body.to ??
+      'English';
+
+    if (typeof rawText !== 'string' || !rawText.trim()) {
+      return sendError(
+        res,
+        400,
+        'Please provide non-empty text.',
+        {
+          expectedBody: {
+            text: 'Hello',
+            targetLanguage: 'Filipino'
+          }
+        }
+      );
     }
 
-    if (text.length > 4000) {
-      return res.status(413).json({
-        ok: false,
-        error: 'Message is too long. Maximum 4000 characters.'
-      });
+    const text = rawText.trim();
+
+    if (text.length > MAX_TEXT_LENGTH) {
+      return sendError(
+        res,
+        413,
+        `Text exceeds the ${MAX_TEXT_LENGTH}-character limit.`
+      );
     }
 
-    const target = normalizeLanguage(requestedLanguage);
+    if (
+      typeof rawTarget !== 'string' &&
+      typeof rawTarget !== 'number'
+    ) {
+      return sendError(
+        res,
+        400,
+        'Target language must be a string.'
+      );
+    }
+
+    const target = normalizeLanguage(rawTarget);
 
     if (!target.code) {
-      return res.status(400).json({
-        ok: false,
-        error: `Unsupported target language: ${requestedLanguage}`,
-        supportedLanguages: '/languages'
-      });
+      return sendError(
+        res,
+        400,
+        `Unsupported target language: ${target.requested}`,
+        {
+          supportedLanguages: '/languages'
+        }
+      );
     }
 
     const providerPayload = {
@@ -426,117 +497,190 @@ app.post('/translate', async (req, res) => {
       providerPayload.api_key = TRANSLATE_API_KEY;
     }
 
-    const upstream = await fetch(TRANSLATE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(providerPayload),
-      signal: AbortSignal.timeout(20000)
-    });
+    const controller = new AbortController();
 
-    const providerBody = await upstream.text();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      REQUEST_TIMEOUT_MS
+    );
+
+    let upstream;
+    let providerBody;
+
+    try {
+      upstream = await fetch(TRANSLATE_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify(providerPayload),
+        signal: controller.signal
+      });
+
+      providerBody = await upstream.text();
+    } finally {
+      clearTimeout(timeout);
+    }
 
     let data;
 
     try {
       data = JSON.parse(providerBody);
-    } catch (_parseError) {
+    } catch (_error) {
       console.error(
-        'Translation provider returned non-JSON:',
+        'Translation provider returned invalid JSON. Status:',
         upstream.status
       );
 
-      return res.status(502).json({
-        ok: false,
-        error: 'Translation provider returned an invalid response.',
-        providerStatus: upstream.status
-      });
+      return sendError(
+        res,
+        502,
+        'Translation provider returned an invalid response.',
+        {
+          providerStatus: upstream.status
+        }
+      );
     }
 
     if (!upstream.ok) {
+      const providerMessage = String(
+        data.error ||
+        data.message ||
+        `HTTP ${upstream.status}`
+      ).slice(0, 300);
+
       console.error(
-        'Translation provider status:',
+        'Translation provider error:',
         upstream.status,
-        data
+        providerMessage
       );
 
-      return res.status(502).json({
-        ok: false,
-        error: 'Translation provider returned an error.',
-        providerStatus: upstream.status,
-        providerMessage: String(
-          data.error ||
-          data.message ||
-          'No provider details supplied'
-        ).slice(0, 300)
-      });
+      return sendError(
+        res,
+        502,
+        'Translation provider returned an error.',
+        {
+          providerStatus: upstream.status,
+          providerMessage
+        }
+      );
     }
 
-    const translatedText = data.translatedText;
+    const translatedText =
+      typeof data.translatedText === 'string'
+        ? data.translatedText
+        : typeof data.translation === 'string'
+          ? data.translation
+          : typeof data.translated_text === 'string'
+            ? data.translated_text
+            : '';
 
-    if (
-      typeof translatedText !== 'string' ||
-      !translatedText.trim()
-    ) {
-      return res.status(502).json({
-        ok: false,
-        error: 'No translated text was returned by the provider.'
-      });
+    if (!translatedText.trim()) {
+      return sendError(
+        res,
+        502,
+        'The translation provider did not return translated text.'
+      );
     }
 
     const detectedCode =
-      typeof data.detectedLanguage?.language === 'string' &&
-      data.detectedLanguage.language.trim()
+      typeof data.detectedLanguage?.language === 'string'
         ? data.detectedLanguage.language.trim()
-        : 'und';
+        : typeof data.detectedLanguage === 'string'
+          ? data.detectedLanguage.trim()
+          : 'und';
+
+    const detectedName = languageName(detectedCode);
+
+    const targetName = languageName(
+      target.code,
+      target.requested
+    );
 
     return res.json({
       ok: true,
       translatedText,
-      detectedLanguage: detectedCode,
-      detectedLanguageName:
-        LANGUAGE_NAMES[detectedCode.toLowerCase()] ||
-        (
-          detectedCode === 'und'
-            ? 'Undetermined'
-            : `Language (${detectedCode})`
-        ),
+      translation: translatedText,
+      detectedLanguage: detectedCode || 'und',
+      detectedLanguageName: detectedName,
       targetLanguage: target.code,
-      targetLanguageName:
-        LANGUAGE_NAMES[target.code.toLowerCase()] ||
-        target.requested
+      targetLanguageName: targetName
     });
-
   } catch (error) {
-    console.error('Translation error:', error);
+    const timedOut = error?.name === 'AbortError';
 
-    return res.status(502).json({
-      ok: false,
-      error: 'Translation provider unavailable.',
-      details: String(error?.message || error)
-    });
+    console.error(
+      'Translation request failed:',
+      error?.message || error
+    );
+
+    return sendError(
+      res,
+      502,
+      timedOut
+        ? 'Translation provider timed out.'
+        : 'Translation provider unavailable.',
+      {
+        details: String(error?.message || error).slice(0, 300)
+      }
+    );
   }
 });
 
-// Friendly response for unknown routes
-app.use((_req, res) => {
+// Handle malformed JSON bodies.
+app.use((error, _req, res, next) => {
+  if (error instanceof SyntaxError && error.status === 400) {
+    return sendError(res, 400, 'Invalid JSON request body.');
+  }
+
+  if (error?.type === 'entity.too.large') {
+    return sendError(res, 413, 'Request body is too large.');
+  }
+
+  return next(error);
+});
+
+// Unknown routes
+app.use((req, res) => {
   res.status(404).json({
     ok: false,
     error: 'Route not found',
+    requestedMethod: req.method,
+    requestedPath: req.path,
     availableRoutes: [
       'GET /',
       'GET /health',
       'GET /debug-version',
       'GET /languages',
       'POST /translate'
-    ]
+    ],
+    hint:
+      req.path === '/translate' && req.method === 'GET'
+        ? 'Use POST /translate with a JSON request body.'
+        : 'Check the URL path and HTTP method.'
   });
+});
+
+// Final error handler
+app.use((error, _req, res, _next) => {
+  console.error('Unhandled server error:', error);
+
+  if (res.headersSent) return;
+
+  return sendError(
+    res,
+    500,
+    'Internal server error.'
+  );
 });
 
 app.listen(PORT, () => {
   console.log(
     `Blue Mode Translation API ${VERSION} listening on port ${PORT}`
+  );
+
+  console.log(
+    `Translation provider: ${TRANSLATE_API_URL}`
   );
 });
