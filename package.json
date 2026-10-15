@@ -1,8 +1,8 @@
 {
   "name": "blue-mode-translation-api",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
-  "description": "Blue Mode Hub Translation API",
+  "description": "Blue Mode Hub Translation API v3",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
