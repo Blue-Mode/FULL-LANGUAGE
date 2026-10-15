@@ -276,7 +276,6 @@ const WORLD_LANGUAGES = {
   Zhuang: 'za'
 };
 
-// Add all language names before constructing the reverse catalogue.
 for (const [name, code] of Object.entries(WORLD_LANGUAGES)) {
   const key = name.toLowerCase();
 
@@ -347,6 +346,7 @@ app.get('/', (_req, res) => {
       health: 'GET /health',
       debugVersion: 'GET /debug-version',
       languages: 'GET /languages',
+      translateStatus: 'GET /translate',
       translate: 'POST /translate'
     }
   });
@@ -367,6 +367,7 @@ app.get('/debug-version', (_req, res) => {
     ok: true,
     version: VERSION,
     translateRouteExists: true,
+    translateStatusRouteExists: true,
     languagesRouteExists: true,
     providerConfigured: Boolean(TRANSLATE_API_URL),
     providerApiKeyConfigured: Boolean(TRANSLATE_API_KEY),
@@ -419,12 +420,31 @@ app.get('/languages', (_req, res) => {
   });
 });
 
+// Browser status route.
+// This makes opening /translate in a browser return ok:true.
+// It does NOT perform a translation; translations use POST below.
+app.get('/translate', (_req, res) => {
+  res.json({
+    ok: true,
+    service: 'Blue Mode Translation API',
+    version: VERSION,
+    endpoint: '/translate',
+    status: 'available',
+    translationMethod: 'POST',
+    expectedBody: {
+      text: 'Hello',
+      targetLanguage: 'English'
+    },
+    message:
+      'The translation endpoint is available. Send a POST request with text and targetLanguage to translate.'
+  });
+});
+
 // Translation endpoint
 app.post('/translate', async (req, res) => {
   try {
     const body = req.body || {};
 
-    // Accept common input field names.
     const rawText =
       body.text ??
       body.message ??
@@ -653,11 +673,12 @@ app.use((req, res) => {
       'GET /health',
       'GET /debug-version',
       'GET /languages',
+      'GET /translate',
       'POST /translate'
     ],
     hint:
       req.path === '/translate' && req.method === 'GET'
-        ? 'Use POST /translate with a JSON request body.'
+        ? 'The GET status route should exist. Check that the latest server version was deployed.'
         : 'Check the URL path and HTTP method.'
   });
 });
